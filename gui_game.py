@@ -517,7 +517,8 @@ class MultiGameGUI:
             )
 
         # 绘制游戏元素
-        board = self.env.game.board
+        state = self.env.game.get_state()
+        board = state['board']
         for row in range(board_size):
             for col in range(board_size):
                 if board[row, col] != 0:

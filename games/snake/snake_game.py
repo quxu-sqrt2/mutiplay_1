@@ -97,6 +97,10 @@ class SnakeGame(BaseGame):
         # 计算奖励
         reward = self._calculate_reward()
         
+        # 切换玩家（除非游戏结束）
+        if not done:
+            self.switch_player()
+        
         # 获取观察状态
         observation = self.get_state()
         
@@ -111,7 +115,7 @@ class SnakeGame(BaseGame):
         
         return observation, reward, done, info
     
-    def get_valid_actions(self, player: int = None) -> List[Tuple[int, int]]:
+    def get_valid_actions(self, player: Optional[int] = None) -> List[Tuple[int, int]]:
         """获取有效动作列表"""
         # 四个方向：上、下、左、右
         directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
@@ -131,7 +135,8 @@ class SnakeGame(BaseGame):
     
     def is_terminal(self) -> bool:
         """检查游戏是否结束"""
-        return not (self.alive1 or self.alive2)
+        # 只要有一条蛇死亡，游戏就结束
+        return not (self.alive1 and self.alive2)
     
     def get_winner(self) -> Optional[int]:
         """获取获胜者"""
@@ -281,19 +286,22 @@ class SnakeGame(BaseGame):
     
     def _check_game_over(self) -> bool:
         """检查游戏是否结束"""
-        return not (self.alive1 or self.alive2)
+        # 游戏结束条件：至少一条蛇死亡
+        return not (self.alive1 and self.alive2)
     
     def _calculate_reward(self) -> float:
         """计算奖励"""
+        # 根据当前玩家和游戏状态计算奖励
         if self.current_player == 1:
             if not self.alive1:
-                return -1.0
+                return -1.0  # 玩家1死亡，负奖励
             elif not self.alive2:
-                return 1.0
-        else:
+                return 1.0   # 玩家2死亡，正奖励
+        else:  # current_player == 2
             if not self.alive2:
-                return -1.0
+                return -1.0  # 玩家2死亡，负奖励
             elif not self.alive1:
-                return 1.0
+                return 1.0   # 玩家1死亡，正奖励
         
+        # 如果两条蛇都存活，奖励为0
         return 0.0 
