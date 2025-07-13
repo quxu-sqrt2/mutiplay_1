@@ -149,21 +149,15 @@ class MinimaxBot(BaseAgent):
             return 0
     
     def evaluate_gomoku_position(self, game):
-        """简化的五子棋评估"""
-        board = game.board
-        score = 0
-        
-        # 只检查有棋子的位置，减少计算量
-        for i in range(game.board_size):
-            for j in range(game.board_size):
-                if board[i][j] != 0:  # 有棋子的位置
-                    player = board[i][j]
-                    if player == self.player_id:
-                        score += self.quick_evaluate(board, i, j)
-                    else:
-                        score -= self.quick_evaluate(board, i, j)
-        
-        return score
+        # 只评估最近一步
+        if hasattr(game, 'last_move') and game.last_move is not None:
+            row, col = game.last_move
+            player = game.board[row][col]
+            if player == self.player_id:
+                return self.quick_evaluate(game.board, row, col)
+            else:
+                return -self.quick_evaluate(game.board, row, col)
+        return 0
 
     def quick_evaluate(self, board, row, col):
         """快速评估单个位置"""
