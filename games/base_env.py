@@ -57,6 +57,13 @@ class BaseEnv(ABC):
         # 检查是否超时
         truncated = self.game.is_timeout()
         
+        # 如果observation是字典，提取board
+        if isinstance(observation, dict) and 'board' in observation:
+            observation = observation['board']
+        elif isinstance(observation, dict):
+            # 如果没有board，使用_get_observation
+            observation = self._get_observation()
+        
         return observation, reward, done, truncated, info
     
     def render(self, mode='human') -> Optional[np.ndarray]:
