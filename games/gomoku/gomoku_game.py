@@ -48,6 +48,10 @@ class GomokuGame(BaseGame):
         self.board[row, col] = self.current_player
         self.history.append((self.current_player, (row, col)))
         self.move_count += 1
+        
+        # 设置last_move，让MinimaxBot的优化生效
+        self.last_move = (row, col)
+        
         done = self.is_terminal()
         reward = 1 if self.get_winner() == self.current_player else 0
         info = {}
@@ -106,6 +110,9 @@ class GomokuGame(BaseGame):
         new_game.game_state = self.game_state
         new_game.move_count = self.move_count
         new_game.history = copy.deepcopy(self.history)
+        # 复制last_move
+        if hasattr(self, 'last_move'):
+            new_game.last_move = self.last_move
         return new_game
     
     def get_action_space(self):

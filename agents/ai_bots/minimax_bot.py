@@ -1,6 +1,7 @@
 from agents.base_agent import BaseAgent
 import copy
 import time
+import numpy as np
 
 class MinimaxBot(BaseAgent):
     def __init__(self, name="MinimaxBot", player_id=1, max_depth=2):
@@ -13,6 +14,15 @@ class MinimaxBot(BaseAgent):
         all_valid_actions = env.get_valid_actions()
         if not all_valid_actions:
             return None
+        
+        # 快速处理：如果棋盘为空，直接返回中心位置
+        if hasattr(env, 'board_size') and self._is_empty_board(env.game.board):
+            center = env.board_size // 2
+            return (center, center)
+        
+        # 如果max_depth=0，直接评估所有动作，不递归
+        if self.max_depth == 0:
+            return self._get_best_action_direct(all_valid_actions, env)
         
         # 只考虑已有棋子周围3格半径的区域
         valid_actions = self.get_nearby_actions(all_valid_actions, env)
@@ -30,6 +40,25 @@ class MinimaxBot(BaseAgent):
             game_copy.step(action)
             # 计算分数（使用 alpha-beta 剪枝）
             score = self.minimax(game_copy, self.max_depth - 1, False, float('-inf'), float('inf'))
+            
+            if score > best_score:
+                best_score = score
+                best_action = action
+                
+        return best_action
+    
+    def _get_best_action_direct(self, actions, env):
+        """直接评估所有动作，不递归"""
+        best_score = float('-inf')
+        best_action = actions[0]
+        
+        for action in actions:
+            # 克隆游戏状态
+            game_copy = env.game.clone()
+            # 执行动作
+            game_copy.step(action)
+            # 直接评估，不递归
+            score = self.evaluate_position(game_copy)
             
             if score > best_score:
                 best_score = score
@@ -186,5 +215,9 @@ class MinimaxBot(BaseAgent):
             return 5
         else:
             return max_count
+    
+    def _is_empty_board(self, board):
+        """检查棋盘是否为空"""
+        return not np.any(board != 0)
         
        
