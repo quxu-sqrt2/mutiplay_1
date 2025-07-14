@@ -79,32 +79,7 @@ class SnakeGame(BaseGame):
             done: 是否结束
             info: 额外信息
         """
-        # 检查反向移动
-        if self.current_player == 1:
-            snake = self.snake1
-            direction = self.direction1
-        else:
-            snake = self.snake2
-            direction = self.direction2
-        if len(snake) >= 2 and action == (-direction[0], -direction[1]):
-            # 反向移动直接判负
-            if self.current_player == 1:
-                self.alive1 = False
-            else:
-                self.alive2 = False
-            done = self._check_game_over()
-            reward = self._calculate_reward()
-            observation = self.get_state()
-            info = {
-                'snake1_length': len(self.snake1),
-                'snake2_length': len(self.snake2),
-                'food_count': len(self.foods),
-                'alive1': self.alive1,
-                'alive2': self.alive2
-            }
-            return observation, reward, done, info
-        
-        # 更新方向
+        # 反向移动在get_valid_actions已被过滤，这里无需再判负
         if self.current_player == 1:
             self.direction1 = action
         else:
