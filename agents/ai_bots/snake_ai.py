@@ -161,8 +161,12 @@ class SmartSnakeAI(BaseAgent):
         return nearest_food
     
     def _a_star_pathfinding(self, start, goal, game):
-        """A*寻路算法"""
+        """A*寻路算法（简化版，避免卡住）"""
         from heapq import heappush, heappop
+        import time
+        
+        start_time = time.time()
+        max_iterations = 100  # 限制最大迭代次数
         
         def heuristic(a, b):
             return abs(a[0] - b[0]) + abs(a[1] - b[1])
@@ -183,8 +187,15 @@ class SmartSnakeAI(BaseAgent):
         came_from = {}
         g_score = {start: 0}
         f_score = {start: heuristic(start, goal)}
+        iterations = 0
         
-        while open_set:
+        while open_set and iterations < max_iterations:
+            iterations += 1
+            
+            # 检查超时
+            if time.time() - start_time > 0.5:  # 500ms超时
+                break
+                
             current = heappop(open_set)[1]
             
             if current == goal:

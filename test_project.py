@@ -136,9 +136,11 @@ def test_agents():
         print("✓ Minimax Bot测试成功")
         
         # 测试MCTS Bot
+        MCTSBot.reset_stats()
         mcts_bot = MCTSBot(name="测试MCTSBot", player_id=3, simulation_count=100)
         action = mcts_bot.get_action(observation, env)
         print("✓ MCTS Bot测试成功")
+        MCTSBot.print_stats()
         
         return True
         

@@ -20,8 +20,16 @@ class MinimaxBot(BaseAgent):
         if not all_valid_actions:
             return None
         
+        # 检查是否是Snake游戏
+        is_snake_game = hasattr(env.game, 'snake1') and hasattr(env.game, 'snake2')
+        
+        if is_snake_game:
+            # Snake游戏：直接选择最佳动作，不进行复杂的搜索
+            return self._get_best_snake_action(all_valid_actions, env)
+        
+        # 五子棋游戏：使用原有的复杂搜索
         # 快速处理：如果棋盘为空，直接返回中心位置
-        if hasattr(env, 'board_size') and self._is_empty_board(env.game.board):
+        if hasattr(env, 'board_size') and hasattr(env.game, 'board') and self._is_empty_board(env.game.board):
             center = env.board_size // 2
             return (center, center)
         
@@ -119,7 +127,15 @@ class MinimaxBot(BaseAgent):
     
     def get_nearby_actions(self, all_actions, env, radius=2):
         """只返回已有棋子周围指定半径内的空位"""
-        if not hasattr(env, 'board_size'):
+        # 检查是否是Snake游戏
+        is_snake_game = hasattr(env.game, 'snake1') and hasattr(env.game, 'snake2')
+        
+        if is_snake_game:
+            # Snake游戏直接返回所有动作
+            return all_actions
+        
+        # 五子棋游戏的处理
+        if not hasattr(env, 'board_size') or not hasattr(env.game, 'board'):
             return all_actions
         
         board = env.game.board
@@ -147,10 +163,17 @@ class MinimaxBot(BaseAgent):
 
     def sort_actions(self, actions, env):
         """对动作进行排序，优先搜索更有希望的动作"""
-        if not hasattr(env, 'board_size'):
+        # 检查是否是Snake游戏
+        is_snake_game = hasattr(env.game, 'snake1') and hasattr(env.game, 'snake2')
+        
+        if is_snake_game:
+            # Snake游戏直接返回原动作列表
             return actions
         
-        # 对于五子棋，优先选择中心位置和已有棋子周围的位置
+        # 五子棋游戏的处理
+        if not hasattr(env, 'board_size') or not hasattr(env.game, 'board'):
+            return actions
+        
         board = env.game.board
         center = env.board_size // 2
         
@@ -282,6 +305,76 @@ class MinimaxBot(BaseAgent):
             return 5
         else:
             return max_count
+    
+    def _get_best_snake_action(self, valid_actions, env):
+        """为Snake游戏选择最佳动作"""
+        if not valid_actions:
+            return None
+        
+        # 获取当前游戏状态
+        state = env.game.get_state()
+        current_player = env.game.current_player
+        
+        # 获取当前玩家的蛇
+        if current_player == 1:
+            snake = state['snake1']
+            direction = state['direction1']
+        else:
+            snake = state['snake2']
+            direction = state['direction2']
+        
+        if not snake:
+            return valid_actions[0]
+        
+        head = snake[0]
+        foods = state['foods']
+        
+        # 策略1：如果有食物，尝试去吃最近的食物
+        if foods:
+            closest_food = min(foods, key=lambda f: abs(f[0] - head[0]) + abs(f[1] - head[1]))
+            
+            # 计算到食物的方向
+            dx = closest_food[0] - head[0]
+            dy = closest_food[1] - head[1]
+            
+            # 选择最接近食物方向的合法动作
+            best_action = None
+            min_distance = float('inf')
+            
+            for action in valid_actions:
+                new_head = (head[0] + action[0], head[1] + action[1])
+                distance = abs(new_head[0] - closest_food[0]) + abs(new_head[1] - closest_food[1])
+                
+                if distance < min_distance:
+                    min_distance = distance
+                    best_action = action
+            
+            if best_action:
+                return best_action
+        
+        # 策略2：如果没有食物或无法到达食物，选择安全的移动方向
+        # 优先选择不会立即撞墙或撞蛇的方向
+        for action in valid_actions:
+            new_head = (head[0] + action[0], head[1] + action[1])
+            
+            # 检查边界
+            if (new_head[0] < 0 or new_head[0] >= env.board_size or
+                new_head[1] < 0 or new_head[1] >= env.board_size):
+                continue
+            
+            # 检查是否撞到自己
+            if new_head in snake:
+                continue
+            
+            # 检查是否撞到对方蛇
+            other_snake = state['snake2'] if current_player == 1 else state['snake1']
+            if new_head in other_snake:
+                continue
+            
+            return action
+        
+        # 如果所有方向都不安全，选择第一个有效动作
+        return valid_actions[0]
     
     def _is_empty_board(self, board):
         """检查棋盘是否为空"""

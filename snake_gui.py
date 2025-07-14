@@ -7,6 +7,7 @@ import pygame
 import sys
 import time
 import os
+import random
 from typing import Optional, Tuple, Dict, Any
 from games.snake import SnakeGame, SnakeEnv
 from agents import RandomBot, SnakeAI, SmartSnakeAI, HumanAgent
@@ -202,26 +203,29 @@ class SnakeGUI:
         if self.game_over or self.paused:
             return
         
-        try:
-            # 执行动作
-            observation, reward, terminated, truncated, info = self.env.step(action)
+        # 获取当前状态
+        state = self.env.game.get_state()
+        
+        # 检查是否是玩家的回合
+        if isinstance(self.current_agent, HumanAgent):
+            # 人类玩家移动
+            self.env.step(action)
             
             # 检查游戏是否结束
-            if terminated or truncated:
+            if self.env.game.is_terminal():
                 self.game_over = True
-                self.winner = self.env.get_winner()
-            else:
-                # 切换玩家
-                self._switch_player()
-        
-        except Exception as e:
-            print(f"Move execution failed: {e}")
+                self.winner = self.env.game.get_winner()
+                return
+            
+            # 切换到AI回合
+            self.current_agent = self.ai_agent
+            self.thinking = True
+            self.last_update = time.time()
     
     def _switch_player(self):
         """切换玩家"""
-        if isinstance(self.current_agent, HumanAgent):
+        if self.current_agent == self.human_agent:
             self.current_agent = self.ai_agent
-            self.thinking = True
         else:
             self.current_agent = self.human_agent
     
@@ -232,39 +236,29 @@ class SnakeGUI:
         
         current_time = time.time()
         
-        # 检查是否需要更新
-        if current_time - self.last_update < self.update_interval:
-            return
-        
-        self.last_update = current_time
-        
-        # AI回合
-        if (not isinstance(self.current_agent, HumanAgent) and self.thinking):
-            try:
-                observation = self.env._get_observation()
-                action = self.current_agent.get_action(observation, self.env)
-                
-                if action:
-                    self._make_move(action)
-                
-                self.thinking = False
-                
-            except Exception as e:
-                print(f"AI thinking failed: {e}")
-                self.thinking = False
-        
-        # 人类玩家回合 - 贪吃蛇需要持续移动
-        elif isinstance(self.current_agent, HumanAgent) and not self.thinking:
-            # 获取当前方向并继续移动
-            current_direction = None
-            if self.env.game.current_player == 1:
-                current_direction = self.env.game.direction1
-            else:
-                current_direction = self.env.game.direction2
+        # AI思考时间
+        if self.thinking and isinstance(self.current_agent, (SnakeAI, SmartSnakeAI, RandomBot)):
+            if current_time - self.last_update < 0.5:  # 500ms思考时间
+                return
             
-            # 直接使用当前方向
-            action = current_direction
-            self._make_move(action)
+            # AI移动
+            state = self.env.game.get_state()
+            action = self.current_agent.get_action(state, self.env)
+            
+            if action is not None:
+                self.env.step(action)
+                
+                # 检查游戏是否结束
+                if self.env.game.is_terminal():
+                    self.game_over = True
+                    self.winner = self.env.game.get_winner()
+                    return
+                
+                # 切换回人类玩家
+                self.current_agent = self.human_agent
+            
+            self.thinking = False
+            self.last_update = current_time
     
     def draw(self):
         """绘制游戏界面"""
