@@ -364,11 +364,13 @@ class MultiGameGUI:
 
                 if action:
                     self._make_move(action)
-
+                # 无论AI是否有动作，都切回玩家
+                self.current_agent = self.human_agent
                 self.thinking = False
 
             except Exception as e:
                 print(f"AI thinking failed: {e}")
+                self.current_agent = self.human_agent
                 self.thinking = False
 
         # 贪吃蛇自动更新（不需要等待输入）

@@ -79,6 +79,31 @@ class SnakeGame(BaseGame):
             done: 是否结束
             info: 额外信息
         """
+        # 检查反向移动
+        if self.current_player == 1:
+            snake = self.snake1
+            direction = self.direction1
+        else:
+            snake = self.snake2
+            direction = self.direction2
+        if len(snake) >= 2 and action == (-direction[0], -direction[1]):
+            # 反向移动直接判负
+            if self.current_player == 1:
+                self.alive1 = False
+            else:
+                self.alive2 = False
+            done = self._check_game_over()
+            reward = self._calculate_reward()
+            observation = self.get_state()
+            info = {
+                'snake1_length': len(self.snake1),
+                'snake2_length': len(self.snake2),
+                'food_count': len(self.foods),
+                'alive1': self.alive1,
+                'alive2': self.alive2
+            }
+            return observation, reward, done, info
+        
         # 更新方向
         if self.current_player == 1:
             self.direction1 = action
@@ -123,14 +148,13 @@ class SnakeGame(BaseGame):
         if player is None:
             player = self.current_player
         
-        # 过滤掉反向移动
         current_direction = self.direction1 if player == 1 else self.direction2
+        snake = self.snake1 if player == 1 else self.snake2
         valid_directions = []
-        
         for direction in directions:
-            if direction != (-current_direction[0], -current_direction[1]):
+            # 只有蛇长度>=2时才禁止反向
+            if len(snake) < 2 or direction != (-current_direction[0], -current_direction[1]):
                 valid_directions.append(direction)
-        
         return valid_directions
     
     def is_terminal(self) -> bool:
@@ -140,6 +164,17 @@ class SnakeGame(BaseGame):
     
     def get_winner(self) -> Optional[int]:
         """获取获胜者"""
+        # 步数达到上限时，比较蛇长度
+        if self.is_max_moves_reached():
+            len1 = len(self.snake1) if self.alive1 else 0
+            len2 = len(self.snake2) if self.alive2 else 0
+            if len1 > len2:
+                return 1
+            elif len2 > len1:
+                return 2
+            else:
+                return None  # 平局
+
         if not self.is_terminal():
             return None
         
