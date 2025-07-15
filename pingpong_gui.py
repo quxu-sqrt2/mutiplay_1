@@ -31,6 +31,7 @@ class PingPongGUI:
         self._create_buttons()
         self.mode = "human_vs_ai"  # 可选: human_vs_ai, human_vs_human, ai_vs_ai
         self.reset()
+        self.paused = False  # 新增：暂停状态
 
     def _create_agents(self):
         # 左挡板
@@ -65,6 +66,8 @@ class PingPongGUI:
             "human_vs_human": pygame.Rect(self.width - 320, 30, 120, 36),
             "ai_vs_ai": pygame.Rect(self.width - 460, 30, 120, 36)
         }
+        # 新增：暂停按钮
+        self.pause_button = pygame.Rect(40, 30, 100, 36)
 
     def reset(self):
         self.env.reset()
@@ -87,6 +90,11 @@ class PingPongGUI:
         # Draw score (下移到画面中间偏上)
         score_text = self.font.render(f"{state['score_left']} : {state['score_right']}", True, BLACK)
         self.screen.blit(score_text, (self.width // 2 - 40, 80))
+        # Draw pause button
+        pygame.draw.rect(self.screen, YELLOW if self.paused else LIGHT_GRAY, self.pause_button)
+        pygame.draw.rect(self.screen, BLACK, self.pause_button, 2)
+        pause_text = self.font.render("Resume" if self.paused else "Pause", True, BLACK)
+        self.screen.blit(pause_text, self.pause_button.move(10, 0))
         # Draw AI selection buttons
         for (side, ai_name), rect in self.ai_buttons.items():
             color = YELLOW if (side == "left" and self.left_ai == ai_name) or (side == "right" and self.right_ai == ai_name) else LIGHT_GRAY
@@ -110,21 +118,21 @@ class PingPongGUI:
                 "Controls:",
                 "Left paddle: W/S/A/D move, Q power shot, E spin",
                 "Right paddle: Up/Down/Left/Right move, 1 power shot, 2 spin",
-                "R: Restart, Close window to exit"
+                "R: Restart, P: Pause/Resume, Close window to exit"
             ]
         elif self.mode == "human_vs_ai":
             op_lines = [
                 "Controls:",
                 "Left paddle: W/S/A/D move, Q power shot, E spin",
                 "Right paddle: AI",
-                "R: Restart, Close window to exit"
+                "R: Restart, P: Pause/Resume, Close window to exit"
             ]
         else:
             op_lines = [
                 "Controls:",
                 "Left paddle: AI",
                 "Right paddle: AI",
-                "R: Restart, Close window to exit"
+                "R: Restart, P: Pause/Resume, Close window to exit"
             ]
         for i, line in enumerate(op_lines):
             color = (80,80,80)
@@ -134,11 +142,18 @@ class PingPongGUI:
         if spin_flag:
             spin_text = self.font.render("Spin!", True, (255, 100, 0))
             self.screen.blit(spin_text, (self.width // 2 - 30, by - 40))
+        # 暂停遮罩
+        if self.paused:
+            overlay = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+            overlay.fill((200, 200, 200, 120))
+            self.screen.blit(overlay, (0, 0))
+            pause_tip = self.font.render("Paused", True, (255, 100, 0))
+            self.screen.blit(pause_tip, (self.width // 2 - 50, self.height // 2 - 30))
         pygame.display.flip()
 
     def run(self):
         try:
-            state, *_ = self.env.reset()
+            state, _ = self.env.reset()
             ai_speed_factor = 0.8  # AI移动速度下降20%
             spin_flag = None
             while not self.done:
@@ -158,6 +173,9 @@ class PingPongGUI:
                             sys.exit()
                         elif event.type == pygame.KEYDOWN:
                             print(f"[LOG] KEYDOWN: {event.key}")
+                            if event.key == pygame.K_p:
+                                self.paused = not self.paused
+                                continue
                             if self.mode in ["human_vs_ai", "human_vs_human"]:
                                 # Left paddle: W/S/A/D
                                 if event.key == pygame.K_w:
@@ -193,7 +211,7 @@ class PingPongGUI:
                             if event.key == pygame.K_r:
                                 print("[LOG] Restarting game.")
                                 self.reset()
-                                state, *_ = self.env.reset()
+                                state, _ = self.env.reset()
                                 spin_flag = None
                                 continue
                         elif event.type == pygame.KEYUP:
@@ -207,106 +225,75 @@ class PingPongGUI:
                                 right_spin_pressed = False
                         elif event.type == pygame.MOUSEBUTTONDOWN:
                             mouse_pos = pygame.mouse.get_pos()
-                            print(f"[LOG] MOUSEBUTTONDOWN at {mouse_pos}")
+                            # 暂停按钮
+                            if self.pause_button.collidepoint(mouse_pos):
+                                self.paused = not self.paused
+                                continue
                             # AI选择按钮
                             for (side, ai_name), rect in self.ai_buttons.items():
                                 if rect.collidepoint(mouse_pos):
                                     if side == "left":
                                         self.left_ai = ai_name
+                                        self._create_agents()
                                     else:
                                         self.right_ai = ai_name
-                                    self._create_agents()
-                                    self.reset()
-                                    state, *_ = self.env.reset()
-                                    spin_flag = None
-                                    break
+                                        self._create_agents()
                             # 模式切换按钮
                             for mode, rect in self.mode_buttons.items():
                                 if rect.collidepoint(mouse_pos):
                                     self.mode = mode
-                                    # 自动切换AI配置
-                                    if mode == "human_vs_ai":
-                                        self.left_ai = "Human"
-                                        self.right_ai = "RuleBasedPingPongAI"
-                                    elif mode == "human_vs_human":
-                                        self.left_ai = "Human"
-                                        self.right_ai = "Human"
-                                    elif mode == "ai_vs_ai":
-                                        self.left_ai = "RuleBasedPingPongAI"
-                                        self.right_ai = "RandomPingPongAI"
-                                    self._create_agents()
                                     self.reset()
-                                    state, *_ = self.env.reset()
-                                    spin_flag = None
-                                    break
-                    # 动作决策
+                                    self._create_agents()
+                    # 按住Q/1持续加力
+                    if left_force_pressed:
+                        action["left_force"] = True
+                    if right_force_pressed:
+                        action2["right_force"] = True
+                    if left_spin_pressed:
+                        action["left_spin"] = True
+                    if right_spin_pressed:
+                        action2["right_spin"] = True
+                    allowed_keys = ['move_left_x', 'move_left_y', 'move_right_x', 'move_right_y', 'left_force', 'right_force', 'left_spin', 'right_spin']
+                    merged_action = {k: v for k, v in action.items() if k in allowed_keys}
+                    merged_action2 = {k: v for k, v in action2.items() if k in allowed_keys}
+                    # AI paddle
+                    if self.left_ai != "Human" and self.left_agent:
+                        ai_action_l = self.left_agent.get_action(self.env.game.get_state(), self.env)
+                        action["move_left_x"] = ai_action_l.get("move_left_x", 0)
+                        action["move_left_y"] = ai_action_l.get("move_left_y", 0)
+                        action["left_force"] = ai_action_l.get("left_force", False)
+                        action["left_spin"] = ai_action_l.get("left_spin", False)
+                    if self.right_ai != "Human" and self.right_agent:
+                        ai_action_r = self.right_agent.get_action(self.env.game.get_state(), self.env)
+                        action["move_right_x"] = ai_action_r.get("move_right_x", 0)
+                        action["move_right_y"] = ai_action_r.get("move_right_y", 0)
+                        action["right_force"] = ai_action_r.get("right_force", False)
+                        action["right_spin"] = ai_action_r.get("right_spin", False)
+                    allowed_keys = ['move_left_x', 'move_left_y', 'move_right_x', 'move_right_y', 'left_force', 'right_force', 'left_spin', 'right_spin']
+                    merged_action = {k: v for k, v in action.items() if k in allowed_keys}
+                    merged_action2 = {k: v for k, v in action2.items() if k in allowed_keys}
+                    # 合并动作
                     if self.mode == "human_vs_human":
-                        merged_action = action.copy()
-                        merged_action.update({k: v for k, v in action2.items() if v})
-                        allowed_keys = ['move_left_x', 'move_left_y', 'move_right_x', 'move_right_y', 'left_force', 'right_force', 'left_spin', 'right_spin']
-                        merged_action = {k: v for k, v in merged_action.items() if k in allowed_keys}
-                        print(f"[DEBUG] merged_action (2P): {merged_action}")
-                        try:
-                            state, reward, done, truncated, info = self.env.step(merged_action)
-                            print(f"[DEBUG] step result (2P): reward={reward}, done={done}, truncated={truncated}, info={info}")
-                            spin_flag = merged_action.get("left_spin") or merged_action.get("right_spin")
-                        except Exception as e:
-                            print(f"[ERROR] Exception in env.step (2P): {e}")
-                            import traceback; traceback.print_exc()
-                            break
-                    else:
-                        # 左挡板
-                        if self.left_ai != "Human" and self.left_agent is not None:
-                            ai_action_l = self.left_agent.get_action(state, self.env)
-                            if random.random() > ai_speed_factor:
-                                ai_action_l = {"move_left_x": 0, "move_left_y": 0, "left_force": False, "left_spin": False}
-                            action["move_left_x"] = ai_action_l.get("move_left_x", 0)
-                            action["move_left_y"] = ai_action_l.get("move_left_y", 0)
-                            action["left_force"] = ai_action_l.get("left_force", False)
-                            action["left_spin"] = ai_action_l.get("left_spin", False)
-                        # 右挡板
-                        if self.right_ai != "Human" and self.right_agent is not None:
-                            ai_action_r = self.right_agent.get_action(state, self.env)
-                            if random.random() > ai_speed_factor:
-                                ai_action_r = {"move_right_x": 0, "move_right_y": 0, "right_force": False, "right_spin": False}
-                            action["move_right_x"] = ai_action_r.get("move_right_x", 0)
-                            action["move_right_y"] = ai_action_r.get("move_right_y", 0)
-                            action["right_force"] = ai_action_r.get("right_force", False)
-                            action["right_spin"] = ai_action_r.get("right_spin", False)
-                        # 按住Q/1持续加力
-                        if left_force_pressed:
-                            action["left_force"] = True
-                        if right_force_pressed:
-                            action2["right_force"] = True
-                        if left_spin_pressed:
-                            action["left_spin"] = True
-                        if right_spin_pressed:
-                            action2["right_spin"] = True
-                        allowed_keys = ['move_left_x', 'move_left_y', 'move_right_x', 'move_right_y', 'left_force', 'right_force', 'left_spin', 'right_spin']
-                        merged_action = {k: v for k, v in action.items() if k in allowed_keys}
-                        print(f"[DEBUG] merged_action (AI): {merged_action}")
-                        try:
-                            state, reward, done, truncated, info = self.env.step(merged_action)
-                            print(f"[DEBUG] step result (AI): reward={reward}, done={done}, truncated={truncated}, info={info}")
-                            spin_flag = merged_action.get("left_spin") or merged_action.get("right_spin")
-                        except Exception as e:
-                            print(f"[ERROR] Exception in env.step (AI): {e}")
-                            import traceback; traceback.print_exc()
-                            break
-                    self.draw(self.env.game.get_state(), spin_flag=spin_flag)
-                    if done:
-                        print("[LOG] Game done. Waiting for restart.")
-                        self.done = True
-                        # 不自动reset，等待玩家按R
+                        merged_action.update(merged_action2)
+                    # 暂停时跳过step
+                    if self.paused:
+                        self.draw(self.env.game.get_state(), spin_flag=spin_flag)
+                        self.clock.tick(60)
                         continue
+                    # step
+                    step_result = self.env.step(merged_action)
+                    state = step_result[0]
+                    self.done = step_result[2]
+                    spin_flag = merged_action.get("left_spin") or merged_action.get("right_spin")
+                    self.draw(self.env.game.get_state(), spin_flag=spin_flag)
                     self.clock.tick(60)
                 except Exception as e:
-                    print(f"[ERROR] Exception in main loop: {e}")
-                    import traceback; traceback.print_exc()
-                    break
+                    print("[EXCEPTION]", e)
+                    traceback.print_exc()
+                    self.clock.tick(60)
         except Exception as e:
-            print(f"[FATAL] Exception in run(): {e}")
-            import traceback; traceback.print_exc()
+            print("[FATAL]", e)
+            traceback.print_exc()
             pygame.quit()
             sys.exit()
 
