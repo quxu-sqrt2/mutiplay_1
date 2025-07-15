@@ -11,6 +11,7 @@ import config
 # 导入游戏模块
 from games.gomoku import GomokuEnv
 from games.snake import SnakeEnv
+from games.pingpong import PingPongEnv
 
 # 导入智能体模块
 from agents import (
@@ -43,6 +44,7 @@ def create_env(game_type: str, **kwargs) -> Any:
     env_map = {
         'gomoku': GomokuEnv,
         'snake': SnakeEnv,
+        'pingpong': PingPongEnv,
         # 'mahjong': MahjongEnv,  # 待实现
     }
     
@@ -197,7 +199,7 @@ def main():
     """主函数"""
     parser = argparse.ArgumentParser(description="双人游戏AI框架")
     parser.add_argument('--game', type=str, default='gomoku', 
-                       choices=['gomoku', 'snake', 'mahjong'],
+                       choices=['gomoku', 'snake', 'pingpong', 'mahjong'],
                        help='游戏类型')
     parser.add_argument('--player1', type=str, default='human',
                        choices=['human', 'random', 'minimax', 'mcts', 'rl', 'behavior_tree'],
@@ -227,6 +229,8 @@ def main():
         elif args.game == 'snake':
             env = create_env(args.game, board_size=args.board_size, 
                            initial_length=args.initial_length, food_count=args.food_count)
+        elif args.game == 'pingpong':
+            env = create_env(args.game)
         else:
             env = create_env(args.game)
         

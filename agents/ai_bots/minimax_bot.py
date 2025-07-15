@@ -20,6 +20,23 @@ class MinimaxBot(BaseAgent):
         if not all_valid_actions:
             return None
         
+        # 规则优先：1. 立即获胜 2. 阻止对手立即获胜
+        board = env.game.board
+        my_id = self.player_id
+        opp_id = 3 - my_id
+        # 1. 立即获胜
+        for action in all_valid_actions:
+            game_copy = env.game.clone()
+            game_copy.step(action)
+            if hasattr(game_copy, 'get_winner') and game_copy.get_winner() == my_id:
+                return action
+        # 2. 阻止对手立即获胜
+        for action in all_valid_actions:
+            game_copy = env.game.clone()
+            game_copy.step(action)
+            if hasattr(game_copy, 'get_winner') and game_copy.get_winner() == opp_id:
+                return action
+        
         # 检查是否是Snake游戏
         is_snake_game = hasattr(env.game, 'snake1') and hasattr(env.game, 'snake2')
         

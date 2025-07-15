@@ -277,7 +277,22 @@ class MCTSBot:
             board = GomokuBoard(size=board_state.shape[0])
             board.board = board_state.copy()
         else:
-            raise ValueError("get_action参数错误，需传入GomokuBoard或(observation, env)")
+            raise ValueError("get_action参数错误，需要传入GomokuBoard或(observation, env)")
+        valid_moves = board.get_valid_moves()
+        my_id = self.player_id
+        opp_id = 2 if my_id == 1 else 1
+        # 1. 立即获胜
+        for move in valid_moves:
+            board_copy = board.clone()
+            board_copy.place(move[0], move[1], my_id)
+            if board_copy.get_winner() == my_id:
+                return move
+        # 2. 阻止对手立即获胜
+        for move in valid_moves:
+            board_copy = board.clone()
+            board_copy.place(move[0], move[1], opp_id)
+            if board_copy.get_winner() == opp_id:
+                return move
         root = MCTSNode(board.clone(), self.player_id)
         start_time = time.time()
         simulations = 0

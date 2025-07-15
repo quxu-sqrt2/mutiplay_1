@@ -43,7 +43,7 @@ AI_CONFIGS = {
         'evaluation_timeout': 5,
     },
     'mcts': {
-        'simulation_count': 1000,
+        'simulation_count': 500,
         'exploration_constant': 1.414,
         'timeout': 10,
     },

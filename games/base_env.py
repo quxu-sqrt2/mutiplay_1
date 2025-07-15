@@ -43,27 +43,31 @@ class BaseEnv(ABC):
     
     def step(self, action: Any) -> Tuple[np.ndarray, float, bool, bool, Dict[str, Any]]:
         """执行动作"""
-        # 检查动作是否有效
-        valid_actions = self.game.get_valid_actions(self.game.current_player)
-        if action not in valid_actions:
+        # 宽松动作校验
+        def is_valid_action(a):
+            if not isinstance(a, dict):
+                return False
+            for k, v in a.items():
+                if k.startswith('move_') and v not in [-1, 0, 1]:
+                    return False
+                if k.endswith('_force') or k.endswith('_spin'):
+                    if v not in [False, True]:
+                        return False
+            return True
+        if not is_valid_action(action):
             return self._get_observation(), -1000, True, False, {'error': 'Invalid action'}
-        
         # 执行动作
         observation, reward, done, info = self.game.step(action)
-        
         # 更新游戏状态
         self.game.update_game_state()
-        
         # 检查是否超时
         truncated = self.game.is_timeout()
-        
         # 如果observation是字典，提取board
         if isinstance(observation, dict) and 'board' in observation:
             observation = observation['board']
         elif isinstance(observation, dict):
             # 如果没有board，使用_get_observation
             observation = self._get_observation()
-        
         return observation, reward, done, truncated, info
     
     def render(self, mode='human') -> Optional[np.ndarray]:
