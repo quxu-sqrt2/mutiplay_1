@@ -1,5 +1,5 @@
 """
-贪吃蛇游戏逻辑（简化版）
+贪吃蛇游戏逻辑（实时双蛇并行版接口增补）
 """
 
 import numpy as np
@@ -11,7 +11,7 @@ import config
 
 class SnakeGame(BaseGame):
     """双人贪吃蛇游戏"""
-    
+
     def __init__(self, board_size: int = 20, initial_length: int = 3, food_count: int = 5):
         game_config = {
             'board_size': board_size,
@@ -20,30 +20,108 @@ class SnakeGame(BaseGame):
             'timeout': config.GAME_CONFIGS['snake']['timeout'],
             'max_moves': config.GAME_CONFIGS['snake']['max_moves']
         }
-        super().__init__(game_config)
-        
         self.board_size = board_size
-        self.initial_length = initial_length
         self.food_count = food_count
-        
+        self.initial_length = initial_length
+        super().__init__(game_config)
+
         # 蛇的位置和方向
-        self.snake1 = []  # 玩家1的蛇
-        self.snake2 = []  # 玩家2的蛇
-        self.direction1 = (0, 1)  # 玩家1的方向
-        self.direction2 = (0, -1)  # 玩家2的方向
-        
-        # 食物位置
+        self.snake1 = []
+        self.snake2 = []
+        self.direction1 = (0, 1)   # 玩家1 当前方向
+        self.direction2 = (0, -1)  # 玩家2 当前方向
+
+        # 食物
         self.foods = []
-        
-        # 游戏状态
+
+        # 状态
         self.alive1 = True
         self.alive2 = True
+        # 新增字段（在 __init__ 里加）
+        self.next_dir1  = self.direction1   # 玩家1 的“待转向”
+        self.next_dir2  = self.direction2   # 玩家2 的“待转向”
+        self.tick_speed = 6                # 每秒 6 步，可调
+
         
         self.reset()
+
+    # ------------------------------------------------------------------
+    # 原有代码保持不变（reset / step / get_state / _move_snake 等）
+    # ------------------------------------------------------------------
+    def set_next_direction(self, player: int, new_dir: Tuple[int, int]):
+       
+        if player == 1 and new_dir != (-self.direction1[0], -self.direction1[1]):
+            self.next_dir1 = new_dir
+        elif player == 2 and new_dir != (-self.direction2[0], -self.direction2[1]):
+            self.next_dir2 = new_dir
+
+    def move_snake1(self):
+        """立即按缓存方向移动蛇1"""
+        if not self.alive1:
+            return
+        self.direction1 = self.next_dir1
+        self._move_snake_body(self.snake1, self.direction1, 1)
+
+    def move_snake2(self):
+        """立即按缓存方向移动蛇2"""
+        if not self.alive2:
+            return
+        self.direction2 = self.next_dir2
+        self._move_snake_body(self.snake2, self.direction2, 2)
+
+    def _move_snake_body(self, snake, direction, player):
+        """移动核心逻辑，与 _move_snake 相似"""
+        head = snake[0]
+        new_head = (head[0] + direction[0], head[1] + direction[1])
+
+        # 边界
+        if not (0 <= new_head[0] < self.board_size and 0 <= new_head[1] < self.board_size):
+            if player == 1:
+                self.alive1 = False
+            else:
+                self.alive2 = False
+            return
+
+        # 自撞
+        if new_head in snake:
+            if player == 1:
+                self.alive1 = False
+            else:
+                self.alive2 = False
+            return
+
+        # 对方身体（跳过头部，允许头碰头同时死亡）
+        other = self.snake2 if player == 1 else self.snake1
+        if new_head in other[1:]:
+            if player == 1:
+                self.alive1 = False
+            else:
+                self.alive2 = False
+            return
+
+        snake.insert(0, new_head)
+        if new_head in self.foods:
+            self.foods.remove(new_head)
+            self._generate_foods()
+        else:
+            snake.pop()
+
+    def is_game_over(self) -> bool:
+        """实时判断"""
+        return not (self.alive1 or self.alive2)
+    
+
+    # ===== 4. 小工具：标记死亡 ========================================
+    def _kill_player(self, player: int):
+        if player == 1:
+            self.alive1 = False
+        else:
+            self.alive2 = False
     
     def reset(self) -> Dict[str, Any]:
         """重置游戏状态"""
         # 初始化蛇的位置
+        self.board = np.zeros((self.board_size, self.board_size), dtype=int)
         center = self.board_size // 2
         self.snake1 = [(center, center - 2)]
         self.snake2 = [(center, center + 2)]
@@ -129,6 +207,11 @@ class SnakeGame(BaseGame):
         
         return valid_directions
     
+    def is_game_over(self) -> bool:
+        """实时判断是否还有蛇活着"""
+        return not (self.alive1 or self.alive2)
+
+
     def is_terminal(self) -> bool:
         """检查游戏是否结束"""
         return not (self.alive1 or self.alive2)

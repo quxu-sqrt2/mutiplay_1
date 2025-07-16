@@ -141,3 +141,16 @@ class BaseGame(ABC):
         """获取观察空间"""
         # 子类需要实现具体的观察空间定义
         raise NotImplementedError("子类必须实现get_observation_space方法") 
+    # 在 base_game.py 中，BaseGame 类里添加：
+
+    def clone(self) -> 'BaseGame':
+        """默认克隆方法，子类可重写"""
+        raise NotImplementedError("子类必须实现clone方法")
+
+    def get_action_space(self) -> Any:
+        """默认动作空间，子类可重写"""
+        return None
+
+    def get_observation_space(self) -> Any:
+        """默认观察空间，子类可重写"""
+        return None

@@ -43,9 +43,10 @@ AI_CONFIGS = {
         'evaluation_timeout': 5,
     },
     'mcts': {
-        'simulation_count': 1000,
+        'simulation_count': 10,
         'exploration_constant': 1.414,
-        'timeout': 10,
+        'rollout_depth': 1,
+        'timeout': 0.1,
     },
     'rl': {
         'learning_rate': 0.1,

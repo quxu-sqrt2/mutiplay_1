@@ -7,11 +7,15 @@ from .minimax_bot import MinimaxBot
 from .mcts_bot import MCTSBot
 from .rl_bot import RLBot
 from .behavior_tree_bot import BehaviorTreeBot
+from .random_pingpong_ai import RandomPingPongAI
+from .rule_based_pingpong_ai import RuleBasedPingPongAI
 
 __all__ = [
     'RandomBot',
     'MinimaxBot',
     'MCTSBot',
     'RLBot',
-    'BehaviorTreeBot'
+    'BehaviorTreeBot',
+    'RandomPingPongAI',
+    'RuleBasedPingPongAI'
 ] 

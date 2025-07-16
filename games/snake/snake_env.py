@@ -87,3 +87,12 @@ class SnakeEnv(BaseEnv):
         cloned_env = SnakeEnv(self.board_size)
         cloned_env.game = cloned_game
         return cloned_env 
+    
+    def step_player(self, player_id, action):
+        # 只让指定玩家执行动作
+        if player_id == 1:
+            self.game.direction1 = action
+            self.game.move_snake1()
+        elif player_id == 2:
+            self.game.direction2 = action
+            self.game.move_snake2()

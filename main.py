@@ -14,7 +14,7 @@ from games.snake import SnakeEnv
 
 # 导入智能体模块
 from agents import (
-    HumanAgent, RandomBot, MinimaxBot, MCTSBot, RLBot, BehaviorTreeBot
+    HumanAgent, RandomBot, MinimaxBot, MCTSBot, RLBot, BehaviorTreeBot,SnakeAI,SmartSnakeAI
 )
 
 
@@ -29,7 +29,9 @@ def create_agent(agent_type: str, player_id: int, name: str = None) -> Any:
         'minimax': MinimaxBot,
         'mcts': MCTSBot,
         'rl': RLBot,
-        'behavior_tree': BehaviorTreeBot
+        'behavior_tree': BehaviorTreeBot,
+        'snake_ai': SnakeAI,
+        'smart_snake_ai': SmartSnakeAI
     }
     
     if agent_type not in agent_map:
@@ -200,10 +202,10 @@ def main():
                        choices=['gomoku', 'snake', 'mahjong'],
                        help='游戏类型')
     parser.add_argument('--player1', type=str, default='human',
-                       choices=['human', 'random', 'minimax', 'mcts', 'rl', 'behavior_tree'],
+                       choices=['human', 'random', 'minimax', 'mcts', 'rl', 'behavior_tree','snake_ai','smart_snake_ai'],
                        help='玩家1类型')
     parser.add_argument('--player2', type=str, default='random',
-                       choices=['human', 'random', 'minimax', 'mcts', 'rl', 'behavior_tree'],
+                       choices=['human', 'random', 'minimax', 'mcts', 'rl', 'behavior_tree','snake_ai','smart_snake_ai'],
                        help='玩家2类型')
     parser.add_argument('--name1', type=str, help='玩家1名称')
     parser.add_argument('--name2', type=str, help='玩家2名称')

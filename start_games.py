@@ -16,11 +16,12 @@ def main():
     print()
     print("请选择游戏模式:")
     print("1. 多游戏GUI - 五子棋和贪吃蛇 (推荐)")
-    print("2. 贪吃蛇专用GUI - 更好的贪吃蛇体验")
-    print("3. 五子棋命令行版本")
-    print("4. 贪吃蛇命令行版本")
-    print("5. 运行测试")
-    print("6. 退出")
+    print("2. 乒乓球GUI - 人机/AI对战")
+    print("3. 贪吃蛇专用GUI - 更好的贪吃蛇体验")
+    print("4. 五子棋命令行版本")
+    print("5. 贪吃蛇命令行版本")
+    print("6. 运行测试")
+    print("7. 退出")
     print()
 
     while True:
@@ -42,8 +43,22 @@ def main():
                 else:
                     print("❌ GUI文件未找到，请检查项目文件")
                 break
-
             elif choice == "2":
+                print("\n🏓 启动乒乓球图形界面...")
+                print("特性:")
+                print("- 支持人机、人人和AI对战")
+                print("- 实时物理模拟")
+                print("- 支持暂停/继续")
+                print("- 左挡板：WASD + Q/E，右挡板：方向键 + 1/2")
+                print()
+
+                if os.path.exists("pingpong_gui.py"):
+                    subprocess.run([sys.executable, "pingpong_gui.py"])
+                else:
+                    print("❌ 乒乓球GUI文件未找到")
+                break
+
+            elif choice == "3":
                 print("\n🐍 启动贪吃蛇专用图形界面...")
                 print("特性:")
                 print("- 专为贪吃蛇优化的界面")
@@ -58,7 +73,9 @@ def main():
                     print("❌ 贪吃蛇GUI文件未找到")
                 break
 
-            elif choice == "3":
+
+
+            elif choice == "4":
                 print("\n♟️  启动五子棋命令行版本...")
                 subprocess.run(
                     [
@@ -74,7 +91,7 @@ def main():
                 )
                 break
 
-            elif choice == "4":
+            elif choice == "5":
                 print("\n🐍 启动贪吃蛇命令行版本...")
                 subprocess.run(
                     [
@@ -90,17 +107,17 @@ def main():
                 )
                 break
 
-            elif choice == "5":
+            elif choice == "6":
                 print("\n🧪 运行项目测试...")
                 subprocess.run([sys.executable, "test_project.py"])
                 break
 
-            elif choice == "6":
+            elif choice == "7":
                 print("\n👋 再见！")
                 sys.exit(0)
 
             else:
-                print("❌ 无效选择，请输入 1-6")
+                print("❌ 无效选择，请输入 1-7")
 
         except KeyboardInterrupt:
             print("\n\n👋 再见！")
