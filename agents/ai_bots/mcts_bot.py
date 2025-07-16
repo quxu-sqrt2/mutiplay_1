@@ -5,6 +5,11 @@ import math
 import random
 import time
 
+# Zobrist哈希表初始化（全局）
+ZOBRIST_SIZE = 15
+ZOBRIST_DEPTH = 10
+ZOBRIST_TABLE = np.random.randint(1, 2**63, size=(ZOBRIST_SIZE, ZOBRIST_SIZE, 3, ZOBRIST_DEPTH), dtype=np.uint64)
+
 class Board:
     def __init__(self, size=15):
         self.size = size
@@ -270,6 +275,79 @@ class MCTSBot:
             board.board = board_state.copy()
         else:
             raise ValueError("get_action参数错误，需传入GomokuBoard或(observation, env)")
+        # 检查对手是否有活三或半活四，且自己没有半活三或四连
+        def find_threat_point():
+            my_id = self.player_id
+            opp_id = 2 if my_id == 1 else 1
+            threat_points = []
+            my_threat = False
+            for x in range(board.size):
+                for y in range(board.size):
+                    if board.board[x, y] != 0:
+                        continue
+                    for dx, dy in [(1,0),(0,1),(1,1),(1,-1)]:
+                        # 检查对手活三
+                        cnt = 1
+                        open_left = open_right = False
+                        for k in range(1, 5):
+                            nx, ny = x + dx * k, y + dy * k
+                            if not (0 <= nx < board.size and 0 <= ny < board.size):
+                                break
+                            if board.board[nx, ny] == opp_id:
+                                cnt += 1
+                            elif board.board[nx, ny] == 0:
+                                open_right = True
+                                break
+                            else:
+                                break
+                        for k in range(1, 5):
+                            nx, ny = x - dx * k, y - dy * k
+                            if not (0 <= nx < board.size and 0 <= ny < board.size):
+                                break
+                            if board.board[nx, ny] == opp_id:
+                                cnt += 1
+                            elif board.board[nx, ny] == 0:
+                                open_left = True
+                                break
+                            else:
+                                break
+                        if cnt == 3 and open_left and open_right:
+                            threat_points.append((x, y))
+                        # 检查对手半活四
+                        if cnt == 4 and (open_left or open_right):
+                            threat_points.append((x, y))
+                        # 检查自己半活三/四
+                        cnt_my = 1
+                        my_open_left = my_open_right = False
+                        for k in range(1, 5):
+                            nx, ny = x + dx * k, y + dy * k
+                            if not (0 <= nx < board.size and 0 <= ny < board.size):
+                                break
+                            if board.board[nx, ny] == my_id:
+                                cnt_my += 1
+                            elif board.board[nx, ny] == 0:
+                                my_open_right = True
+                                break
+                            else:
+                                break
+                        for k in range(1, 5):
+                            nx, ny = x - dx * k, y - dy * k
+                            if not (0 <= nx < board.size and 0 <= ny < board.size):
+                                break
+                            if board.board[nx, ny] == my_id:
+                                cnt_my += 1
+                            elif board.board[nx, ny] == 0:
+                                my_open_left = True
+                                break
+                            else:
+                                break
+                        if (cnt_my == 3 and (my_open_left or my_open_right)) or (cnt_my == 4):
+                            my_threat = True
+            return threat_points, my_threat
+        threat_points, my_threat = find_threat_point()
+        if threat_points and not my_threat:
+            # 直接防守第一个威胁点
+            return threat_points[0]
         root = MCTSNode(board.clone(), self.player_id)
         start_time = time.time()
         simulations = 0
@@ -311,19 +389,46 @@ class MCTSBot:
         start = time.time()
         best_score = None
         trans_table = {}
+        # 检查是否有威胁（对手有冲五/活四）
+        def has_opp_four():
+            opp_id = 2 if player == 1 else 1
+            for dx, dy in [(1,0),(0,1),(1,1),(1,-1)]:
+                for x in range(board.size):
+                    for y in range(board.size):
+                        line = []
+                        for k in range(-4,5):
+                            nx, ny = x+k*dx, y+k*dy
+                            if 0<=nx<board.size and 0<=ny<board.size:
+                                line.append(board.board[nx,ny])
+                            else:
+                                line.append(-1)
+                        for i in range(len(line)-4):
+                            window = line[i:i+5]
+                            opp_count = window.count(opp_id)
+                            e_count = window.count(0)
+                            if opp_count == 4 and e_count == 1:
+                                return True
+            return False
+        # 动态调整最大深度
+        if has_opp_four():
+            dynamic_max_depth = max_depth_limit  # 有威胁时用原深度
+            dynamic_top_n = 8
+        else:
+            dynamic_max_depth = max(1, int(max_depth_limit * 0.7))  # 否则减少更多
+            dynamic_top_n = 3
         max_depth = 1
-        while time.time() - start < max_time and max_depth <= max_depth_limit:
-            score = self._minimax_simulation(board, player, max_depth, True, float('-inf'), float('inf'), trans_table)
+        while time.time() - start < max_time and max_depth <= dynamic_max_depth:
+            score = self._minimax_simulation(board, player, max_depth, True, float('-inf'), float('inf'), trans_table, dynamic_top_n)
             if best_score is None or score > best_score:
                 best_score = score
             max_depth += 1
         return best_score if best_score is not None else 0
 
-    def _minimax_simulation(self, board: GomokuBoard, player, depth, maximizing, alpha, beta, trans_table=None):
+    def _minimax_simulation(self, board, player, depth, maximizing, alpha, beta, trans_table=None, top_n=5):
         winner = board.get_winner()
-        key = (board.board.tobytes(), player, depth, maximizing)
-        if trans_table is not None and key in trans_table:
-            return trans_table[key]
+        zobrist_key = self._zobrist_hash(board, player, depth)
+        if trans_table is not None and zobrist_key in trans_table:
+            return trans_table[zobrist_key]
         if winner == self.player_id:
             return 100000
         elif winner is not None:
@@ -331,21 +436,21 @@ class MCTSBot:
         if depth == 0 or board.is_terminal():
             val = self._evaluate(board)
             if trans_table is not None:
-                trans_table[key] = val
+                trans_table[zobrist_key] = val
             return val
-        valid_moves = board.get_valid_moves(player, self._evaluate, top_n=10)
+        valid_moves = board.get_valid_moves(player, self._evaluate, top_n=top_n)
         if maximizing:
             max_score = float('-inf')
             for move in valid_moves:
                 board_copy = board.clone()
                 board_copy.place(move[0], move[1], player)
-                score = self._minimax_simulation(board_copy, 2 if player==1 else 1, depth-1, False, alpha, beta, trans_table)
+                score = self._minimax_simulation(board_copy, 2 if player==1 else 1, depth-1, False, alpha, beta, trans_table, top_n)
                 max_score = max(max_score, score)
                 alpha = max(alpha, score)
-                if beta <= alpha:
+                if beta <= alpha or max_score < -1e8:  # 剪枝：分数明显无望时立即return
                     break
             if trans_table is not None:
-                trans_table[key] = max_score
+                trans_table[zobrist_key] = max_score
             return max_score
         else:
             min_score = float('inf')
@@ -353,38 +458,67 @@ class MCTSBot:
             for move in valid_moves:
                 board_copy = board.clone()
                 board_copy.place(move[0], move[1], opp_id)
-                score = self._minimax_simulation(board_copy, player, depth-1, True, alpha, beta, trans_table)
+                score = self._minimax_simulation(board_copy, player, depth-1, True, alpha, beta, trans_table, top_n)
                 min_score = min(min_score, score)
                 beta = min(beta, score)
-                if beta <= alpha:
+                if beta <= alpha or min_score > 1e8:  # 剪枝：分数明显无望时立即return
                     break
             if trans_table is not None:
-                trans_table[key] = min_score
+                trans_table[zobrist_key] = min_score
             return min_score
 
-    def _evaluate(self, board: GomokuBoard):
-        # 局势评估函数，考虑活二、活三、冲四、活四、活五等
+    def _zobrist_hash(self, board, player, depth):
+        h = 0
+        for x in range(board.size):
+            for y in range(board.size):
+                v = board.board[x, y]
+                if v:
+                    h ^= int(ZOBRIST_TABLE[x, y, v, depth % ZOBRIST_DEPTH])
+        h ^= int(ZOBRIST_TABLE[0, 0, player, depth % ZOBRIST_DEPTH])
+        return h
+
+    def _evaluate(self, board):
         key = board.board.tobytes()
         if key in self._eval_cache:
             return self._eval_cache[key]
         my_id = self.player_id
         opp_id = 2 if my_id == 1 else 1
+        # 检查自己是否有直接胜利
+        if board.get_winner() == my_id:
+            return 1e9
+        # 检查对手是否有冲五/活四
+        def has_opp_four():
+            for dx, dy in [(1,0),(0,1),(1,1),(1,-1)]:
+                for x in range(board.size):
+                    for y in range(board.size):
+                        line = []
+                        for k in range(-4,5):
+                            nx, ny = x+k*dx, y+k*dy
+                            if 0<=nx<board.size and 0<=ny<board.size:
+                                line.append(board.board[nx,ny])
+                            else:
+                                line.append(-1)
+                        for i in range(len(line)-4):
+                            window = line[i:i+5]
+                            opp_count = window.count(opp_id)
+                            e_count = window.count(0)
+                            my_count = window.count(my_id)
+                            if opp_count == 4 and e_count == 1 and my_count == 0:
+                                return True
+            return False
+        if has_opp_four():
+            return -1e9
         def score_patterns(player):
             score = 0
             patterns = {
-                (5, 0): 100000,   # 活五
-                (4, 1): 10000,    # 活四
-                (4, 0): 5000,     # 冲四
-                (3, 2): 1000,     # 活三
-                (3, 1): 500,      # 眠三
-                (2, 2): 100,      # 活二
-                (2, 1): 50        # 眠二
+                (5, 0): 1000000,   # 活五
+                (4, 1): 500000,    # 活四（冲五，优先级极高）
+                (4, 0): 200000,     # 冲四
+                (3, 2): 10000,     # 活三
+                (3, 1): 3000,      # 眠三
+                (2, 2): 500,      # 活二
+                (2, 1): 100        # 眠二
             }
-            # 三连/四连进攻/防守分数
-            three_attack = 2000
-            three_defense = 1800
-            four_attack = 9000
-            four_defense = 20000  # 极大化防守分数，优先阻断对手四连
             # 位置权重：中心高，边缘低
             pos_weight = np.zeros((board.size, board.size))
             center = board.size // 2
@@ -401,7 +535,6 @@ class MCTSBot:
                                 line.append(board.board[nx,ny])
                             else:
                                 line.append(-1)
-                        # 检查所有长度为5的窗口
                         for i in range(len(line)-4):
                             window = line[i:i+5]
                             p_count = window.count(player)
@@ -410,28 +543,26 @@ class MCTSBot:
                             opp_count = window.count(opp_id)
                             # 四连进攻（自己四子一空）
                             if p_count == 4 and e_count == 1 and opp_count == 0:
-                                score += four_attack
+                                score += 400000
                             # 四连防守（对手四子一空）
                             if opp_count == 4 and e_count == 1 and p_count == 0:
-                                score += four_defense
+                                score += 500000
                             # 三连进攻（自己三子两空）
                             if p_count == 3 and e_count == 2 and opp_count == 0:
                                 if window[0]==0 and window[4]==0:
-                                    score += three_attack
+                                    score += 10000
                             # 三连防守（对手三子两空）
                             if opp_count == 3 and e_count == 2 and p_count == 0:
                                 if window[0]==0 and window[4]==0:
-                                    score += three_defense
+                                    score += 9000
                             if p_count == 5:
                                 score += patterns[(5,0)]
                             elif p_count == 4 and e_count == 1:
-                                # 活四或冲四
                                 if window[0]==0 or window[4]==0:
                                     score += patterns[(4,1)]
                                 else:
                                     score += patterns[(4,0)]
                             elif p_count == 3 and e_count == 2:
-                                # 活三
                                 if window[0]==0 and window[4]==0:
                                     score += patterns[(3,2)]
                                 else:
@@ -446,7 +577,7 @@ class MCTSBot:
                                 if cell == player:
                                     wx, wy = x + (idx-2)*dx, y + (idx-2)*dy
                                     if 0<=wx<board.size and 0<=wy<board.size:
-                                        score += pos_weight[wx, wy]
+                                        score += 2*pos_weight[wx, wy]  # 中心加权更高
             return score
         my_score = score_patterns(my_id)
         opp_score = score_patterns(opp_id)
